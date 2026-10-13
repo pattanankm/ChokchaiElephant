@@ -1,3 +1,5 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -6,13 +8,17 @@ import config from './config/index.js';
 import routes from './routes/index.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 
+const here = path.dirname(fileURLToPath(import.meta.url));
+const publicDir = path.resolve(here, '../public');
+
 export function createApp() {
   const app = express();
 
-  // รันหลัง nginx จึงต้องเชื่อ X-Forwarded-For เพื่อให้ rate limiter เห็น IP จริงของผู้ใช้
+  // รันหลัง nginx หรือ reverse proxy จึงต้องเชื่อ X-Forwarded-For
   app.set('trust proxy', 1);
 
-  app.use(helmet());
+  // ปิด CSP ชั่วคราวเพื่อให้โหลด CDN Tailwind, Google Fonts และแผนที่ได้
+  app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
   app.use(
     cors((req, callback) => {
       const { origin, host } = req.headers;
@@ -43,16 +49,18 @@ export function createApp() {
   if (!config.isProduction) app.use(morgan('dev'));
   else app.use(morgan('combined'));
 
-  app.get('/', (_req, res) => {
-    res.json({
-      name: 'Chokchai Elephant Camp API',
-      status: 'ok',
-      health: '/api/health',
-      docs: '/api',
-    });
-  });
-
   app.use('/api', routes);
+
+  // เสิร์ฟหน้าเว็บ Frontend (index.html, activities.html, admin.html ฯลฯ)
+  app.use(express.static(publicDir, { extensions: ['html'] }));
+
+  // ถ้าผู้ใช้เปิดผ่านเบราว์เซอร์แล้วไม่พบเส้นทาง ให้เปิด index.html
+  app.get('*', (req, res, next) => {
+    if (req.accepts('html')) {
+      return res.sendFile(path.join(publicDir, 'index.html'));
+    }
+    next();
+  });
 
   app.use(notFoundHandler);
   app.use(errorHandler);
