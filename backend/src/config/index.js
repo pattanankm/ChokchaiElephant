@@ -25,6 +25,7 @@ if (!['postgres', 'postgresql', 'pg', 'mysql', 'mysql2'].includes(dbClient)) {
   throw new Error(`Unsupported DB_CLIENT "${dbClient}" (use "postgres" or "mysql")`);
 }
 const isPostgres = dbClient.startsWith('p');
+const databaseUrl = process.env.DATABASE_URL?.trim();
 
 export const config = {
   nodeEnv,
@@ -38,12 +39,14 @@ export const config = {
   db: {
     client: isPostgres ? 'pg' : 'mysql2',
     isPostgres,
+    connectionString: databaseUrl || undefined,
+    ssl: process.env.DB_SSL ? process.env.DB_SSL === 'true' : Boolean(databaseUrl),
     host: process.env.DB_HOST ?? 'localhost',
     port: toInt(process.env.DB_PORT, isPostgres ? 5432 : 3306),
     user: process.env.DB_USER ?? 'chokchai',
     password: process.env.DB_PASSWORD ?? 'chokchai',
     database: process.env.DB_NAME ?? 'chokchai',
-    poolMin: toInt(process.env.DB_POOL_MIN, 2),
+    poolMin: toInt(process.env.DB_POOL_MIN, databaseUrl ? 0 : 2),
     poolMax: toInt(process.env.DB_POOL_MAX, 10),
   },
   jwt: {
