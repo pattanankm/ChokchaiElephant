@@ -43,6 +43,15 @@ export function createApp() {
   if (!config.isProduction) app.use(morgan('dev'));
   else app.use(morgan('combined'));
 
+  app.get('/', (_req, res) => {
+    res.json({
+      name: 'Chokchai Elephant Camp API',
+      status: 'ok',
+      health: '/api/health',
+      docs: '/api',
+    });
+  });
+
   app.use('/api', routes);
 
   app.use(notFoundHandler);

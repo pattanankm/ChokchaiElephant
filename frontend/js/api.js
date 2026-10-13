@@ -12,7 +12,7 @@ const LIVE_SERVER_PORTS = ['5500', '5501'];
  * - ปล่อยว่าง '' สำหรับรันในเครื่อง (localhost) หรือผ่าน Docker / Nginx
  * - เมื่อนำ Backend ขึ้น Render ให้ใส่ URL ของ Render เช่น 'https://chokchai-backend.onrender.com/api'
  */
-const CLOUD_API_BASE = '';
+const CLOUD_API_BASE = 'https://chokchaielephant.onrender.com/api';
 
 const API_BASE = (() => {
   if (CLOUD_API_BASE) return CLOUD_API_BASE.replace(/\/$/, '');
