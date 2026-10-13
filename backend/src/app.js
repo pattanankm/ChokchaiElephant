@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import fs from 'node:fs';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -10,6 +11,35 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.resolve(here, '../public');
+
+const caseMap = new Map();
+
+function resolveStaticFile(baseDir, reqPath) {
+  if (caseMap.has(reqPath)) return caseMap.get(reqPath);
+
+  const parts = reqPath.split('/').filter(Boolean);
+  let currentDir = baseDir;
+
+  for (const part of parts) {
+    if (!fs.existsSync(currentDir)) {
+      caseMap.set(reqPath, null);
+      return null;
+    }
+    const files = fs.readdirSync(currentDir);
+    let match = files.find((f) => f === part);
+    if (!match) {
+      match = files.find((f) => f.toLowerCase() === part.toLowerCase());
+    }
+    if (!match) {
+      caseMap.set(reqPath, null);
+      return null;
+    }
+    currentDir = path.join(currentDir, match);
+  }
+
+  caseMap.set(reqPath, currentDir);
+  return currentDir;
+}
 
 export function createApp() {
   const app = express();
@@ -51,11 +81,42 @@ export function createApp() {
 
   app.use('/api', routes);
 
+  // Case-insensitive file resolver สำหรับ Linux (เช่น Render)
+  // แก้ปัญหาชื่อไฟล์ .JPG vs .jpg หรือตัวพิมพ์เล็ก-ใหญ่ใน URL รูปภาพ
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/api')) return next();
+
+    const decodedPath = decodeURIComponent(req.path);
+    const ext = path.extname(decodedPath);
+    if (!ext) return next();
+
+    const directPath = path.join(publicDir, decodedPath);
+    try {
+      if (fs.existsSync(directPath) && fs.statSync(directPath).isFile()) {
+        return next();
+      }
+    } catch {}
+
+    const resolved = resolveStaticFile(publicDir, decodedPath);
+    if (resolved) {
+      try {
+        if (fs.existsSync(resolved) && fs.statSync(resolved).isFile()) {
+          return res.sendFile(resolved);
+        }
+      } catch {}
+    }
+
+    next();
+  });
+
   // เสิร์ฟหน้าเว็บ Frontend (index.html, activities.html, admin.html ฯลฯ)
   app.use(express.static(publicDir, { extensions: ['html'] }));
 
-  // ถ้าผู้ใช้เปิดผ่านเบราว์เซอร์แล้วไม่พบเส้นทาง ให้เปิด index.html
+  // ถ้าผู้ใช้เปิดผ่านเบราว์เซอร์แล้วไม่พบเส้นทาง (เฉพาะคำขอ HTML ที่ไม่มีนามสกุลไฟล์) ให้เปิด index.html
   app.get('*', (req, res, next) => {
+    if (path.extname(req.path)) {
+      return next();
+    }
     if (req.accepts('html')) {
       return res.sendFile(path.join(publicDir, 'index.html'));
     }
