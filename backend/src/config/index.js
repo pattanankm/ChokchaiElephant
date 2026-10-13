@@ -1,6 +1,21 @@
 import dotenv from 'dotenv';
+import path from 'node:path';
+import fs from 'node:fs';
 
-dotenv.config();
+const loadEnv = () => {
+  const candidates = [
+    path.resolve(process.cwd(), '.env.local'),
+    path.resolve(process.cwd(), '.env'),
+    path.resolve(process.cwd(), '../.env.local'),
+    path.resolve(process.cwd(), '../.env'),
+  ];
+  for (const file of candidates) {
+    if (fs.existsSync(file)) {
+      dotenv.config({ path: file });
+    }
+  }
+};
+loadEnv();
 
 const required = (key, fallback) => {
   const value = process.env[key] ?? fallback;
@@ -85,6 +100,19 @@ export const config = {
     email: process.env.SEED_ADMIN_EMAIL ?? 'admin@chokchai.local',
     password: process.env.SEED_ADMIN_PASSWORD ?? 'Admin@1234',
     name: process.env.SEED_ADMIN_NAME ?? 'ผู้ดูแลระบบ',
+  },
+  neon: {
+    branch: process.env.NEON_BRANCH ?? 'production',
+    authBaseUrl: process.env.NEON_AUTH_BASE_URL ?? '',
+    authJwksUrl: process.env.NEON_AUTH_JWKS_URL ?? '',
+    functionHelloUrl: process.env.NEON_FUNCTION_HELLO_BASE_URL ?? '',
+    storage: {
+      endpoint: process.env.AWS_ENDPOINT_URL_S3 ?? '',
+      region: process.env.AWS_REGION ?? 'ap-southeast-1',
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID ?? '',
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? '',
+      bucket: process.env.NEON_STORAGE_BUCKET ?? 'assets',
+    },
   },
 };
 
